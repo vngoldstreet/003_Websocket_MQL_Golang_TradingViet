@@ -1,4 +1,4 @@
-module 017_meta_trader_data
+module 003_tradingviet_mql_ws
 
 go 1.18
 
