@@ -37,19 +37,33 @@ func main() {
 	router.Run(":8802")
 }
 
-type DataEa struct {
-	XMLName xml.Name `xml:"data_ea"`
+type AllDatas struct {
+	AccountDatas []AccountDatas
+}
+
+type AccountDatas struct {
+	XMLName xml.Name `xml:"data"`
 	Text    string   `xml:",chardata"`
-	Item    []struct {
-		Text      string  `xml:",chardata"`
-		ID        int     `xml:"id,attr"`
-		Name      string  `xml:"name,attr"`
-		Balance   float64 `xml:"balance,attr"`
-		Equity    float64 `xml:"equity,attr"`
-		PosProfit float64 `xml:"pos_profit,attr"`
-		HisProfit float64 `xml:"his_profit,attr"`
-		PerProfit float64 `xml:"per_profit,attr"`
-	} `xml:"item"`
+	Info    struct {
+		Text      string `xml:",chardata"`
+		Name      string `xml:"name,attr"`
+		ID        string `xml:"id,attr"`
+		Balance   string `xml:"balance,attr"`
+		Equity    string `xml:"equity,attr"`
+		PosProfit string `xml:"pos_profit,attr"`
+		HisProfit string `xml:"his_profit,attr"`
+		PerProfit string `xml:"per_profit,attr"`
+	} `xml:"info"`
+	Order []struct {
+		Text      string `xml:",chardata"`
+		Symbol    string `xml:"symbol,attr"`
+		Type      string `xml:"type,attr"`
+		Volume    string `xml:"volume,attr"`
+		SlPrice   string `xml:"sl_price,attr"`
+		TpPrice   string `xml:"tp_price,attr"`
+		Profit    string `xml:"profit,attr"`
+		CurrentPr string `xml:"current_pr,attr"`
+	} `xml:"order"`
 }
 
 type DataIndi struct {
@@ -61,6 +75,8 @@ type DataIndi struct {
 		Data     float64 `xml:"data,attr"`
 	} `xml:"item"`
 }
+
+var account_datas []AllDatas
 
 func DataStreamFromMQL5(w http.ResponseWriter, r *http.Request) {
 	conn, err := upgrader.Upgrade(w, r, nil)
@@ -75,40 +91,31 @@ func DataStreamFromMQL5(w http.ResponseWriter, r *http.Request) {
 			break
 		}
 		fmt.Printf("msg: %s\n", msg)
+		var data_resp []AllDatas
+		xml.Unmarshal(msg, &data_resp)
+		fmt.Printf("data_resp: %v\n", data_resp)
+		// json, err := json.Unmarshal()
 
-		data_resp := DataEa{}
-		data_indi_resp := DataIndi{}
-
-		if err_mars := xml.Unmarshal(msg, &data_resp); err_mars == nil {
-			data := []DataStreamEAs{}
-			for _, v := range data_resp.Item {
-				cur := DataStreamEAs{
-					ID:        v.ID,
-					Name:      v.Name,
-					Balance:   v.Balance,
-					Equity:    v.Equity,
-					HisProfit: v.HisProfit,
-					PerProfit: v.PerProfit,
-				}
-				data = append(data, cur)
-			}
-			ea_data = data
-		}
-
-		if err_mars := xml.Unmarshal(msg, &data_indi_resp); err_mars == nil {
-			data := []DataStreamIndis{}
-			for _, v := range data_indi_resp.Item {
-				cur := DataStreamIndis{
-					Name: v.IndiName,
-					Data: v.Data,
-				}
-				data = append(data, cur)
-			}
-			indi_data = data
-		}
-
+		// data_resp := AccountDatas{}
+		// if err_mars := xml.Unmarshal(msg, &data_resp); err_mars == nil {
+		// 	data := []DataStreamEAs{}
+		// 	for _, v := range data_resp.Item {
+		// 		cur := DataStreamEAs{
+		// 			ID:        v.ID,
+		// 			Name:      v.Name,
+		// 			Balance:   v.Balance,
+		// 			Equity:    v.Equity,
+		// 			HisProfit: v.HisProfit,
+		// 			PosProfit: v.PosProfit,
+		// 			PerProfit: v.PerProfit,
+		// 		}
+		// 		data = append(data, cur)
+		// 	}
+		// 	ea_data = data
+		// }
+		account_datas = data_resp
 		conn.WriteMessage(t, msg)
-		// tick = time.NewTicker(time.Millisecond * 100)
+		tick = time.NewTicker(time.Second)
 	}
 }
 
@@ -128,12 +135,8 @@ type DataStreamEAs struct {
 }
 
 type DataStreams struct {
-	DataStreamEAs   []DataStreamEAs
-	DataStreamIndis []DataStreamIndis
+	AccountDatas []AllDatas
 }
-
-var ea_data []DataStreamEAs
-var indi_data []DataStreamIndis
 
 var tick *time.Ticker
 
@@ -151,8 +154,7 @@ func StreamDatas(w http.ResponseWriter, r *http.Request) {
 		case <-tick.C:
 			{
 				datastream := DataStreams{
-					DataStreamEAs:   ea_data,
-					DataStreamIndis: indi_data,
+					AccountDatas: account_datas,
 				}
 				conn.WriteJSON(datastream)
 			}
